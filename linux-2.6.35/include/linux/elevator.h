@@ -165,6 +165,9 @@ extern struct request *elv_rb_find(struct rb_root *, sector_t);
 #define ELEVATOR_INSERT_BACK	2
 #define ELEVATOR_INSERT_SORT	3
 #define ELEVATOR_INSERT_REQUEUE	4
+#ifdef CONFIG_BLK_DEV_SCRUB
+#define ELEVATOR_INSERT_VERIFY	5
+#endif /* CONFIG_BLK_DEV_SCRUB */
 
 /*
  * return values from elevator_may_queue_fn

@@ -618,6 +618,9 @@ blk_init_allocated_queue_node(struct request_queue *q, request_fn_proc *rfn,
 	blk_queue_make_request(q, __make_request);
 
 	q->sg_reserved_size = INT_MAX;
+#ifdef CONFIG_BLK_DEV_SCRUB
+	q->scrubber = NULL;
+#endif
 
 	/*
 	 * all done

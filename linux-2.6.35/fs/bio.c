@@ -689,6 +689,10 @@ static void bio_set_map_data(struct bio_map_data *bmd, struct bio *bio,
 
 static void bio_free_map_data(struct bio_map_data *bmd)
 {
+#ifdef CONFIG_BLK_DEV_SCRUB
+	if (bmd == NULL)
+		return;
+#endif /* CONFIG_BLK_DEV_SCRUB */
 	kfree(bmd->iovecs);
 	kfree(bmd->sgvecs);
 	kfree(bmd);

@@ -643,6 +643,14 @@ void elv_insert(struct request_queue *q, struct request *rq, int where)
 		__blk_run_queue(q);
 		break;
 
+#ifdef CONFIG_BLK_DEV_SCRUB
+	case ELEVATOR_INSERT_VERIFY:
+		rq->cmd_flags |= REQ_SORTED;
+		q->nr_sorted++;
+		q->elevator->ops->elevator_add_req_fn(q, rq);
+		break;
+#endif
+
 	case ELEVATOR_INSERT_SORT:
 		BUG_ON(!blk_fs_request(rq) && !blk_discard_rq(rq));
 		rq->cmd_flags |= REQ_SORTED;

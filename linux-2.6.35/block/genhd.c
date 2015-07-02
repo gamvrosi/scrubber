@@ -551,6 +551,27 @@ void add_disk(struct gendisk *disk)
 	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,
 				   "bdi");
 	WARN_ON(retval);
+
+#ifdef CONFIG_BLK_DEV_SCRUB
+	/* Identify block device based on statically assigned major number
+	 * (as seen on Documentation/devices.txt) */
+	switch (disk->major) {
+		/* 1. MFM/RLL/IDE hard disk (or CD-ROM) interfaces */
+		case 3: case 13: case 22: case 33: case 34: case 56: case 57:
+		case 88: case 89: case 90: case 91:
+		/* 2. SCSI disk devices (0-255) */
+		case 8: case 65: case 66: case 67: case 68: case 69: case 70:
+		case 71: case 128: case 129: case 130: case 131: case 132:
+		case 133: case 134: case 135:
+		/* 3. RAID devices */
+		case 9:
+		/* 4. User-mode Virtual Block disks */
+		case 98:
+			blk_register_scrub(disk);
+		default:
+			break;
+	}
+#endif
 }
 
 EXPORT_SYMBOL(add_disk);
@@ -558,6 +579,9 @@ EXPORT_SYMBOL(del_gendisk);	/* in partitions/check.c */
 
 void unlink_gendisk(struct gendisk *disk)
 {
+#ifdef CONFIG_BLK_DEV_SCRUB
+	blk_unregister_scrub(disk);
+#endif
 	sysfs_remove_link(&disk_to_dev(disk)->kobj, "bdi");
 	bdi_unregister(&disk->queue->backing_dev_info);
 	blk_unregister_queue(disk);

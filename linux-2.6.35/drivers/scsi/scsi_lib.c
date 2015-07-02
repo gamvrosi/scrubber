@@ -1069,14 +1069,23 @@ int scsi_setup_blk_pc_cmnd(struct scsi_device *sdev, struct request *req)
 		if (unlikely(ret))
 			return ret;
 	} else {
+#ifdef CONFIG_BLK_DEV_SCRUB
+		if (!req->cmd || req->cmd[0] != 0x2f)
+			BUG_ON(blk_rq_bytes(req));
+#else
 		BUG_ON(blk_rq_bytes(req));
+#endif /* CONFIG_BLK_DEV_SCRUB */
 
 		memset(&cmd->sdb, 0, sizeof(cmd->sdb));
 		req->buffer = NULL;
 	}
 
 	cmd->cmd_len = req->cmd_len;
+#ifdef CONFIG_BLK_DEV_SCRUB
+	if (!blk_rq_bytes(req) || (req->cmd && req->cmd[0] == 0x2f))
+#else
 	if (!blk_rq_bytes(req))
+#endif /* CONFIG_BLK_DEV_SCRUB */
 		cmd->sc_data_direction = DMA_NONE;
 	else if (rq_data_dir(req) == WRITE)
 		cmd->sc_data_direction = DMA_TO_DEVICE;

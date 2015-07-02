@@ -65,6 +65,16 @@ config BLK_DEV_BSG
 
 	  If unsure, say Y.
 
+config BLK_DEV_SCRUB
+	bool "Block device scrubber"
+	depends on SYSFS
+	help 
+	  Say Y here, if you want to enable a block device scrubber. Scrubbing
+	  allows the kernel to scrub a device periodically, in order to
+	  minimize the possibility of data loss due to latent sector errors.
+	  Scrubbing parameters can be customized via the scrubber's sysfs
+	  interface.
+
 config BLK_DEV_INTEGRITY
 	bool "Block layer data integrity support"
 	---help---

@@ -244,6 +244,33 @@ static int blk_fill_sghdr_rq(struct request_queue *q, struct request *rq,
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_SCRUB
+static int blk_kern_fill_sghdr_rq(struct request_queue *q, struct request *rq,
+	struct sg_io_hdr *hdr, fmode_t mode)
+{
+	memcpy((void*) rq->cmd, (void*) hdr->cmdp, (size_t) hdr->cmd_len);
+
+	if (blk_verify_command(rq->cmd, mode & FMODE_WRITE))
+		return -EPERM;
+
+	/*
+	 * fill in request structure
+	 */
+	rq->cmd_len = hdr->cmd_len;
+	rq->cmd_type = REQ_TYPE_BLOCK_PC;
+
+	rq->timeout = msecs_to_jiffies(hdr->timeout);
+	if (!rq->timeout)
+		rq->timeout = q->sg_timeout;
+	if (!rq->timeout)
+		rq->timeout = BLK_DEFAULT_SG_TIMEOUT;
+	if (rq->timeout < BLK_MIN_SG_TIMEOUT)
+		rq->timeout = BLK_MIN_SG_TIMEOUT;
+
+	return 0;
+}
+#endif
+
 static int blk_complete_sghdr_rq(struct request *rq, struct sg_io_hdr *hdr,
 				 struct bio *bio)
 {
@@ -376,6 +403,143 @@ out:
 	blk_put_request(rq);
 	return ret;
 }
+
+#ifdef CONFIG_BLK_DEV_SCRUB
+/**
+ * sg_kern_complete_rq - executes a completion event on a request
+ * @rq: request to complete
+ * @error: end I/O status of the request
+ */
+static void sg_kern_complete_rq(struct request *rq, int error)
+{
+	struct completion *waiting = rq->end_io_data;
+
+	rq->end_io_data = NULL;
+	__blk_put_request(rq->q, rq);
+
+	/*
+	 * complete last, if this is a stack request the process (and thus
+	 * the rq pointer) could be invalid right after this complete()
+	 */
+	complete(waiting);
+}
+
+static int sg_kern_io(struct request_queue *q, struct gendisk *bd_disk,
+	struct sg_io_hdr *hdr, fmode_t mode)
+{
+	unsigned long start_time;
+	int writing = 0, ret = 0;
+	struct request *rq;
+	char sense[SCSI_SENSE_BUFFERSIZE];
+	unsigned char *vCmdBlk;
+	struct bio *bio;
+	DECLARE_COMPLETION_ONSTACK(wait);
+
+	if (hdr->interface_id != 'S')
+		return -EINVAL;
+	if (hdr->cmd_len > BLK_MAX_CDB)
+		return -EINVAL;
+
+	if (hdr->dxfer_len > (queue_max_hw_sectors(q) << 9))
+		return -EIO;
+
+	if (hdr->dxfer_len)
+		switch (hdr->dxfer_direction) {
+		default:
+			return -EINVAL;
+		case SG_DXFER_TO_DEV:
+			writing = 1;
+			break;
+		case SG_DXFER_TO_FROM_DEV:
+		case SG_DXFER_FROM_DEV:
+			break;
+		}
+
+	rq = blk_get_request(q, writing ? WRITE : READ, GFP_KERNEL);
+	if (!rq)
+		return -ENOMEM;
+
+	if (blk_kern_fill_sghdr_rq(q, rq, hdr, mode)) {
+		blk_put_request(rq);
+		return -EFAULT;
+	}
+
+	if (hdr->iovec_count) {
+		ret = blk_rq_map_user_iov(q, rq, NULL, hdr->dxferp,
+			hdr->iovec_count, hdr->dxfer_len, GFP_KERNEL);
+	} else if (hdr->dxfer_len) {
+		ret = blk_rq_map_user(q, rq, NULL, hdr->dxferp,
+			hdr->dxfer_len, GFP_KERNEL);
+	}
+
+	if (ret)
+		goto out;
+
+	bio = rq->bio;
+	rq->bio = NULL;
+	memset(sense, 0, sizeof(sense));
+	rq->sense = sense;
+	rq->sense_len = 0;
+	rq->retries = 0;
+
+	start_time = jiffies;
+
+	/* ignore return value. All information is passed back to caller
+	 * (if he doesn't check that is his problem).
+	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
+	 */
+	//blk_execute_rq(q, bd_disk, rq, 0);
+
+	/*
+	 * we need an extra reference to the request, so we can look at it
+	 * after io completion
+	 */
+
+	rq->ref_count++;
+	rq->end_io_data = &wait;
+	rq->cmd_flags |= REQ_NOMERGE;
+
+	if (bio == NULL) {
+		if ((bio = bio_alloc(__GFP_WAIT, 0)) == NULL)
+			printk(KERN_INFO "scrubber: Error in allocating bio for request!\n");
+		bio->bi_flags |= 1 << BIO_NULL_MAPPED;
+		bio_get(bio);
+	}
+
+	vCmdBlk = hdr->cmdp;
+	if (vCmdBlk != NULL) {
+		bio->bi_sector = (vCmdBlk[2] << 24 & 0xff000000) |
+				 (vCmdBlk[3] << 16 & 0x00ff0000) |
+				 (vCmdBlk[4] <<  8 & 0x0000ff00) |
+				 (vCmdBlk[5]       & 0x000000ff);
+		rq->__sector = bio->bi_sector;
+
+		bio->bi_size = ((vCmdBlk[7] << 8 & 0x0000ff00) |
+				(vCmdBlk[8]      & 0x000000ff)) << 9;
+		rq->__data_len = bio->bi_size;
+		/* printk(KERN_INFO "scrubber: Attention! Sector = %lu, Data length = %u",
+			rq->__sector, rq->__data_len); */
+	} else {
+		printk(KERN_INFO "vCmdBlk was NULL\n");
+	}
+
+	/*
+	 * Some ioscheds (cfq) run q->request_fn directly, so
+	 * rq cannot be accessed after calling
+	 * elevator_add_req_fn.
+	 */
+
+	blk_execute_scsi_nowait(q, bd_disk, rq, 0, sg_kern_complete_rq);
+	wait_for_completion_interruptible(&wait);
+
+	hdr->duration = jiffies_to_msecs(jiffies - start_time);
+
+	return blk_complete_sghdr_rq(rq, hdr, bio);
+out:
+	blk_put_request(rq);
+	return ret;
+}
+#endif
 
 /**
  * sg_scsi_ioctl  --  handle deprecated SCSI_IOCTL_SEND_COMMAND ioctl
@@ -676,6 +840,35 @@ int scsi_cmd_ioctl(struct request_queue *q, struct gendisk *bd_disk, fmode_t mod
 	return err;
 }
 EXPORT_SYMBOL(scsi_cmd_ioctl);
+
+#ifdef CONFIG_BLK_DEV_SCRUB
+int scsi_kern_ioctl(struct request_queue *q, struct gendisk *bd_disk,
+	fmode_t mode, unsigned int cmd, struct sg_io_hdr *arg)
+{
+	int err;
+
+	if (!q || blk_get_queue(q))
+		return -ENXIO;
+
+	switch (cmd) {
+		/*
+		 * new sgv3 interface
+		 */
+		case SG_IO: {
+			err = -EFAULT;
+			err = sg_kern_io(q, bd_disk, arg, mode);
+			if (err == -EFAULT)
+				break;
+			break;
+		}
+		default:
+			err = -ENOTTY;
+	}
+
+	blk_put_queue(q);
+	return err;
+}
+#endif
 
 static int __init blk_scsi_ioctl_init(void)
 {

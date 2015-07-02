@@ -13,6 +13,10 @@
 #include <linux/kdev_t.h>
 #include <linux/rcupdate.h>
 
+#ifdef CONFIG_BLK_DEV_SCRUB
+#include <linux/scrub.h>
+#endif /* CONFIG_BLK_DEV_SCRUB */ 
+
 #ifdef CONFIG_BLOCK
 
 #define kobj_to_dev(k)		container_of((k), struct device, kobj)
@@ -154,6 +158,9 @@ struct gendisk {
 
 	const struct block_device_operations *fops;
 	struct request_queue *queue;
+#ifdef CONFIG_BLK_DEV_SCRUB
+	struct disk_scrubber *scrubber;
+#endif /* CONFIG_BLK_DEV_SCRUB */
 	void *private_data;
 
 	int flags;

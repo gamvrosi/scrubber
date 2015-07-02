@@ -63,6 +63,25 @@ void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 }
 EXPORT_SYMBOL_GPL(blk_execute_rq_nowait);
 
+#ifdef CONFIG_BLK_DEV_SCRUB
+void blk_execute_scsi_nowait(struct request_queue *q, struct gendisk *bd_disk,
+			struct request *rq, int at_head, rq_end_io_fn *done)
+{
+	//int where = at_head ? ELEVATOR_INSERT_FRONT : ELEVATOR_INSERT_BACK;
+
+	rq->rq_disk = bd_disk;
+	rq->end_io = done;
+	WARN_ON(irqs_disabled());
+	spin_lock_irq(q->queue_lock);
+	__elv_add_request(q, rq, ELEVATOR_INSERT_VERIFY, 1);
+	__generic_unplug_device(q);
+	/* the queue is stopped so it won't be plugged+unplugged */
+	//if (blk_pm_resume_request(rq))
+	//	q->request_fn(q);
+	spin_unlock_irq(q->queue_lock);
+}
+#endif
+
 /**
  * blk_execute_rq - insert a request into queue for execution
  * @q:		queue to insert the request in

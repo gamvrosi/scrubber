@@ -20,6 +20,10 @@
 #include <linux/bsg.h>
 #include <linux/smp.h>
 
+#ifdef CONFIG_BLK_DEV_SCRUB
+#include <linux/scrub.h>
+#endif /* CONFIG_BLK_DEV_SCRUB */
+
 #include <asm/scatterlist.h>
 
 struct scsi_ioctl_command;
@@ -433,6 +437,9 @@ struct request_queue
 #ifdef CONFIG_BLK_DEV_IO_TRACE
 	struct blk_trace	*blk_trace;
 #endif
+#ifdef CONFIG_BLK_DEV_SCRUB
+	struct disk_scrubber	*scrubber;
+#endif /* CONFIG_BLK_DEV_SCRUB */
 	/*
 	 * reserved for flush operations
 	 */
@@ -616,7 +623,12 @@ enum {
 #define blk_rq_io_stat(rq)	((rq)->cmd_flags & REQ_IO_STAT)
 #define blk_rq_quiet(rq)	((rq)->cmd_flags & REQ_QUIET)
 
+#ifdef CONFIG_BLK_DEV_SCRUB
+#define blk_account_rq(rq)	(blk_rq_started(rq) &&	\
+				(blk_pc_request(rq) || blk_fs_request(rq) || blk_discard_rq(rq))) 
+#else
 #define blk_account_rq(rq)	(blk_rq_started(rq) && (blk_fs_request(rq) || blk_discard_rq(rq))) 
+#endif /* CONFIG_BLK_DEV_SCRUB */
 
 #define blk_pm_suspend_request(rq)	((rq)->cmd_type == REQ_TYPE_PM_SUSPEND)
 #define blk_pm_resume_request(rq)	((rq)->cmd_type == REQ_TYPE_PM_RESUME)
@@ -796,6 +808,10 @@ extern int blk_remove_plug(struct request_queue *);
 extern void blk_recount_segments(struct request_queue *, struct bio *);
 extern int scsi_cmd_ioctl(struct request_queue *, struct gendisk *, fmode_t,
 			  unsigned int, void __user *);
+#ifdef CONFIG_BLK_DEV_SCRUB
+extern int scsi_kern_ioctl(struct request_queue *, struct gendisk *, fmode_t,
+			   unsigned int, struct sg_io_hdr *);
+#endif /* CONFIG_BLK_DEV_SCRUB */
 extern int sg_scsi_ioctl(struct request_queue *, struct gendisk *, fmode_t,
 			 struct scsi_ioctl_command __user *);
 
@@ -836,6 +852,10 @@ extern int blk_execute_rq(struct request_queue *, struct gendisk *,
 			  struct request *, int);
 extern void blk_execute_rq_nowait(struct request_queue *, struct gendisk *,
 				  struct request *, int, rq_end_io_fn *);
+#ifdef CONFIG_BLK_DEV_SCRUB
+extern void blk_execute_scsi_nowait(struct request_queue *, struct gendisk *,
+				    struct request *, int, rq_end_io_fn *);
+#endif /* CONFIG_BLK_DEV_SCRUB */
 extern void blk_unplug(struct request_queue *q);
 
 static inline struct request_queue *bdev_get_queue(struct block_device *bdev)
