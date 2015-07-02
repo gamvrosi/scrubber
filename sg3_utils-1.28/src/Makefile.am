@@ -14,7 +14,7 @@ bin_PROGRAMS = \
 	sg_prevent sg_raw sg_rbuf sg_rdac sg_read sg_readcap \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_requests sg_reset sg_rmsn sg_rtpg sg_safte sg_sat_identify \
-	sg_sat_phy_event sg_sat_set_features sg_scan sg_senddiag sg_ses \
+	sg_sat_phy_event sg_sat_set_features sg_scan sg_scrubber sg_senddiag sg_ses \
 	sg_start sg_stpg sg_sync sg_test_rwbuf sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_wr_mode
 
@@ -36,7 +36,7 @@ bin_PROGRAMS = \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
+	sg_sat_set_features sg_scan sg_scrubber sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
 
@@ -58,7 +58,7 @@ bin_PROGRAMS = \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
+	sg_sat_set_features sg_scan sg_scrubber sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
 
@@ -80,7 +80,7 @@ bin_PROGRAMS = \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
+	sg_sat_set_features sg_scrubber sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
 
@@ -96,7 +96,7 @@ bin_PROGRAMS = \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
+	sg_sat_set_features sg_scrubber sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
 
@@ -112,7 +112,7 @@ bin_PROGRAMS = \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
+	sg_sat_set_features sg_scrubber sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
 
@@ -229,6 +229,9 @@ sg_sat_set_features_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_scan_SOURCES = sg_scan.c
 sg_scan_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_scrubber_SOURCES = sg_scrubber.c
+sg_scrubber_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_senddiag_SOURCES = sg_senddiag.c
 sg_senddiag_LDADD = ../lib/libsgutils2.la @os_libs@
